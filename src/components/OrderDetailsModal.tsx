@@ -1,0 +1,149 @@
+import { useEffect, useState } from "react";
+import axios from "axios";
+import { X, MapPin } from "lucide-react";
+import { toast } from "sonner";
+
+interface Props {
+  orderId: number;
+  onClose: () => void;
+}
+
+const OrderDetailsModal = ({ orderId, onClose }: Props) => {
+  const token = localStorage.getItem("token");
+
+  const [order, setOrder] = useState<any>(null);
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchOrder = async () => {
+    try {
+      const res = await axios.get(
+        `http://localhost:5000/api/orders/${orderId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setOrder(res.data.order);
+      setItems(res.data.items);
+      setLoading(false);
+    } catch (err) {
+      toast.error("Failed to load order");
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrder();
+  }, []);
+
+  const cancelOrder = async () => {
+    try {
+      await axios.put(
+        `http://localhost:5000/api/orders/${orderId}/cancel`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      toast.success("Order cancelled");
+      fetchOrder();
+    } catch {
+      toast.error("Cancel failed");
+    }
+  };
+
+  if (loading) return null;
+
+  const steps = ["Pending", "Processed", "Shipped", "Delivered"];
+  const currentStep = steps.indexOf(order.status);
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="w-full max-w-3xl bg-white rounded-xl p-8 max-h-[90vh] overflow-y-auto">
+
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold">Order Details</h2>
+          <button onClick={onClose}>
+            <X />
+          </button>
+        </div>
+
+        {/* Order Info */}
+        <div className="border rounded-lg p-4 mb-6">
+          <p><strong>Order ID:</strong> {order.id}</p>
+          <p><strong>Date:</strong> {new Date(order.created_at).toLocaleDateString()}</p>
+        </div>
+
+        {/* Tracking */}
+        <div className="mb-8">
+          <h3 className="font-semibold mb-4">Tracking Details</h3>
+          <div className="flex justify-between">
+            {steps.map((step, index) => (
+              <div key={step} className="flex flex-col items-center">
+                <div
+                  className={`h-4 w-4 rounded-full ${
+                    index <= currentStep
+                      ? "bg-blue-500"
+                      : "bg-gray-300"
+                  }`}
+                />
+                <span className="text-xs mt-2">{step}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Items */}
+        <div className="mb-6">
+          <h3 className="font-semibold mb-4">Cart Details</h3>
+          <div className="space-y-4">
+            {items.map((item) => (
+              <div
+                key={item.id}
+                className="flex justify-between border rounded-lg p-4"
+              >
+                <div className="flex gap-4">
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="h-16 w-16 rounded-lg object-cover"
+                  />
+                  <div>
+                    <p className="font-medium">{item.name}</p>
+                    <p className="text-sm text-gray-500">
+                      Qty: {item.quantity}
+                    </p>
+                  </div>
+                </div>
+                <p className="font-semibold">
+                  ₹ {(item.price * item.quantity).toFixed(2)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Order Summary */}
+        <div className="border rounded-lg p-4 mb-6">
+          <h3 className="font-semibold mb-3">Order Summary</h3>
+          <div className="flex justify-between">
+            <span>Total</span>
+            <span className="font-bold">₹ {order.total}</span>
+          </div>
+        </div>
+
+        {/* Cancel Button */}
+        {order.status !== "Delivered" &&
+          order.status !== "Cancelled" && (
+            <button
+              onClick={cancelOrder}
+              className="w-full bg-red-500 text-white py-3 rounded-lg hover:bg-red-600 transition"
+            >
+              Cancel Order
+            </button>
+          )}
+      </div>
+    </div>
+  );
+};
+
+export default OrderDetailsModal;

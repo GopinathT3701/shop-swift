@@ -30,7 +30,7 @@ const Footer = () => {
             <div className="flex flex-col gap-2">
               <span className="text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer">About Us</span>
               <span className="text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer">Contact</span>
-              <span className="text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer">Privacy Policy</span>
+              <span className="text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer"><Link to="/privacy">Privacy Policy</Link></span>
               <span className="text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer">Terms of Service</span>
             </div>
           </div>

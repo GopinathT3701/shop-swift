@@ -1,18 +1,132 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "@/context/CartContext";
-import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
+import { ShoppingBag } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import axios from "axios";
+import { toast } from "sonner";
+import { useState } from "react";
 
 const Cart = () => {
-  const { items, updateQuantity, removeFromCart, totalPrice } = useCart();
+  const navigate = useNavigate();
+  const { items, removeFromCart, totalPrice } = useCart();
+  const [loading, setLoading] = useState(false);
 
+  const handlePayment = async () => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      toast.error("Please login first");
+      navigate("/login");
+      return;
+    }
+
+    if (loading) return;
+
+    try {
+      setLoading(true);
+
+      // 1️⃣ Create Razorpay Order from backend
+      const { data } = await axios.post(
+  "http://localhost:5000/api/payment/create-order",
+  { amount: totalPrice },
+  {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }
+);
+
+      if (!(window as any).Razorpay) {
+        toast.error("Razorpay SDK not loaded");
+        return;
+      }
+
+      const options = {
+        key: "rzp_test_SFxIn9vseSSiih",
+        amount: data.amount,
+        currency: "INR",
+        name: "ShopVibe",
+        description: "Order Payment",
+        order_id: data.id,
+
+        prefill: {
+          name: "Customer",
+          email: "customer@example.com",
+          contact: "9999999999",
+        },
+
+        theme: {
+          color: "#6366f1",
+        },
+
+       handler: async function (response: any) {
+  try {
+
+    await axios.post(
+      "http://localhost:5000/api/payment/verify",
+      {
+        razorpay_order_id: response.razorpay_order_id,
+        razorpay_payment_id: response.razorpay_payment_id,
+        razorpay_signature: response.razorpay_signature,
+
+        items: items.map((item) => ({
+          product_id: item.product.id,
+          quantity: item.quantity,
+          price: item.product.price,
+        })),
+
+        total: totalPrice,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    toast.success("Payment Verified & Order Placed");
+
+    items.forEach((item) =>
+      removeFromCart(item.product.id)
+    );
+
+    navigate("/profile");
+
+  } catch (err) {
+    toast.error("Payment verification failed");
+  }
+},
+
+        modal: {
+          ondismiss: function () {
+            toast.error("Payment cancelled");
+          },
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+
+    } catch (err) {
+      console.error(err);
+      toast.error("Payment failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🟢 Empty cart UI
   if (items.length === 0) {
     return (
       <div className="container mx-auto flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
         <ShoppingBag className="mb-4 h-16 w-16 text-muted-foreground/40" />
-        <h2 className="mb-2 font-display text-2xl font-bold text-foreground">Your cart is empty</h2>
-        <p className="mb-6 text-muted-foreground">Looks like you haven't added anything yet.</p>
-        <Link to="/products" className="rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground transition-transform hover:scale-105">
+        <h2 className="mb-2 font-display text-2xl font-bold text-foreground">
+          Your cart is empty
+        </h2>
+        <Link
+          to="/products"
+          className="rounded-full bg-primary px-8 py-3 text-sm font-semibold text-white"
+        >
           Start Shopping
         </Link>
       </div>
@@ -21,40 +135,40 @@ const Cart = () => {
 
   return (
     <div className="container mx-auto min-h-screen px-4 py-8">
-      <h1 className="mb-8 font-display text-3xl font-bold text-foreground">Shopping Cart</h1>
+      <h1 className="mb-8 font-display text-3xl font-bold text-foreground">
+        Shopping Cart
+      </h1>
 
       <div className="grid gap-8 lg:grid-cols-3">
+        {/* Cart Items */}
         <div className="lg:col-span-2">
           <AnimatePresence>
             {items.map((item) => (
               <motion.div
                 key={item.product.id}
                 layout
-                exit={{ opacity: 0, x: -100 }}
                 className="mb-4 flex gap-4 rounded-xl border border-border bg-card p-4"
               >
-                <img src={item.product.image} alt={item.product.name} className="h-24 w-24 rounded-lg object-cover" />
-                <div className="flex flex-1 flex-col justify-between">
+                <img
+                  src={item.product.image}
+                  alt={item.product.name}
+                  className="h-24 w-24 rounded-lg object-cover"
+                />
+
+                <div className="flex flex-1 justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-foreground">{item.product.name}</h3>
-                    <p className="text-xs text-muted-foreground">{item.product.category}</p>
+                    <h3 className="font-semibold">
+                      {item.product.name}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      {item.product.category}
+                    </p>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => updateQuantity(item.product.id, item.quantity - 1)} className="flex h-8 w-8 items-center justify-center rounded-full border border-border transition-colors hover:bg-accent">
-                        <Minus className="h-3 w-3" />
-                      </button>
-                      <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="flex h-8 w-8 items-center justify-center rounded-full border border-border transition-colors hover:bg-accent">
-                        <Plus className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-sm font-bold text-foreground">${(item.product.price * item.quantity).toFixed(2)}</span>
-                      <button onClick={() => removeFromCart(item.product.id)} className="text-muted-foreground transition-colors hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+
+                  <div className="text-right">
+                    <p className="font-bold">
+                      ₹ {(item.product.price * item.quantity).toFixed(2)}
+                    </p>
                   </div>
                 </div>
               </motion.div>
@@ -62,27 +176,23 @@ const Cart = () => {
           </AnimatePresence>
         </div>
 
-        {/* Order Summary */}
+        {/* Summary */}
         <div className="h-fit rounded-xl border border-border bg-card p-6">
-          <h3 className="mb-4 text-lg font-semibold text-foreground">Order Summary</h3>
-          <div className="mb-4 space-y-2 text-sm">
-            <div className="flex justify-between text-muted-foreground">
-              <span>Subtotal</span>
-              <span>${totalPrice.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-muted-foreground">
-              <span>Shipping</span>
-              <span>Free</span>
-            </div>
+          <h3 className="mb-4 text-lg font-semibold">
+            Order Summary
+          </h3>
+
+          <div className="flex justify-between font-bold">
+            <span>Total</span>
+            <span>₹ {totalPrice.toFixed(2)}</span>
           </div>
-          <div className="mb-6 border-t border-border pt-4">
-            <div className="flex justify-between text-base font-bold text-foreground">
-              <span>Total</span>
-              <span>${totalPrice.toFixed(2)}</span>
-            </div>
-          </div>
-          <button className="w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.02] active:scale-[0.98]">
-            Proceed to Checkout
+
+          <button
+            onClick={handlePayment}
+            disabled={loading}
+            className="mt-6 w-full rounded-full bg-primary py-3 text-white disabled:opacity-50"
+          >
+            {loading ? "Processing..." : "Pay Now"}
           </button>
         </div>
       </div>
