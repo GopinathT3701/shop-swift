@@ -13,6 +13,10 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import ProfileLayout from "./pages/profile/ProfileLayout";
+import AccountTab from "./pages/profile/AccountTab";
+import OrdersTab from "./pages/profile/OrdersTab";
+import AddressesTab from "./pages/profile/AddressesTab";
 import Privacy from "./pages/Privacy";
 
 const queryClient = new QueryClient();
@@ -36,6 +40,11 @@ const App = () => (
                 <Route path="/profile" element={<Profile />} />
                 <Route path="*" element={<NotFound />} />
                 <Route path="/privacy" element={<Privacy />} />
+                <Route path="/profile" element={<ProfileLayout />}>
+  <Route path="account" element={<AccountTab />} />
+  <Route path="orders" element={<OrdersTab />} />
+  <Route path="addresses" element={<AddressesTab />} />
+</Route>
               </Routes>
             </main>
             <Footer />
