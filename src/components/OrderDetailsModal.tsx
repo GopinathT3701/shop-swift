@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { X, MapPin } from "lucide-react";
+import { X, MapPin, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props {
@@ -25,7 +25,7 @@ const OrderDetailsModal = ({ orderId, onClose }: Props) => {
       setOrder(res.data.order);
       setItems(res.data.items);
       setLoading(false);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load order");
       setLoading(false);
     }
@@ -35,31 +35,16 @@ const OrderDetailsModal = ({ orderId, onClose }: Props) => {
     fetchOrder();
   }, []);
 
-  const cancelOrder = async () => {
-    try {
-      await axios.put(
-        `http://localhost:5000/api/orders/${orderId}/cancel`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+  if (loading || !order) return null;
 
-      toast.success("Order cancelled");
-      fetchOrder();
-    } catch {
-      toast.error("Cancel failed");
-    }
-  };
-
-  if (loading) return null;
-
-  const steps = ["Pending", "Processed", "Shipped", "Delivered"];
+  const steps = ["Received", "Processed", "Shipped", "Delivered"];
   const currentStep = steps.indexOf(order.status);
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="w-full max-w-3xl bg-white rounded-xl p-8 max-h-[90vh] overflow-y-auto">
 
-        {/* Header */}
+        {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold">Order Details</h2>
           <button onClick={onClose}>
@@ -67,32 +52,35 @@ const OrderDetailsModal = ({ orderId, onClose }: Props) => {
           </button>
         </div>
 
-        {/* Order Info */}
+        {/* ORDER BASIC INFO */}
         <div className="border rounded-lg p-4 mb-6">
           <p><strong>Order ID:</strong> {order.id}</p>
           <p><strong>Date:</strong> {new Date(order.created_at).toLocaleDateString()}</p>
+          <p><strong>Status:</strong> {order.status}</p>
         </div>
 
-        {/* Tracking */}
-        <div className="mb-8">
-          <h3 className="font-semibold mb-4">Tracking Details</h3>
-          <div className="flex justify-between">
-            {steps.map((step, index) => (
-              <div key={step} className="flex flex-col items-center">
-                <div
-                  className={`h-4 w-4 rounded-full ${
-                    index <= currentStep
-                      ? "bg-blue-500"
-                      : "bg-gray-300"
-                  }`}
-                />
-                <span className="text-xs mt-2">{step}</span>
-              </div>
-            ))}
+        {/* TRACKING */}
+        {order.status !== "Cancelled" && (
+          <div className="mb-8">
+            <h3 className="font-semibold mb-4">Tracking Details</h3>
+            <div className="flex justify-between">
+              {steps.map((step, index) => (
+                <div key={step} className="flex flex-col items-center flex-1">
+                  <div
+                    className={`h-4 w-4 rounded-full ${
+                      index <= currentStep
+                        ? "bg-blue-500"
+                        : "bg-gray-300"
+                    }`}
+                  />
+                  <span className="text-xs mt-2">{step}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Items */}
+        {/* CART ITEMS */}
         <div className="mb-6">
           <h3 className="font-semibold mb-4">Cart Details</h3>
           <div className="space-y-4">
@@ -122,7 +110,46 @@ const OrderDetailsModal = ({ orderId, onClose }: Props) => {
           </div>
         </div>
 
-        {/* Order Summary */}
+        {/* DELIVERY ADDRESS */}
+        <div className="border rounded-lg p-4 mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <MapPin size={18} />
+            <h3 className="font-semibold">Delivery Address</h3>
+          </div>
+
+          {order.name ? (
+            <>
+              <p>{order.name}</p>
+              <p>{order.address1}</p>
+              <p>{order.city}, {order.state}</p>
+              <p>{order.zipcode}</p>
+            </>
+          ) : (
+            <p className="text-gray-500">No address available</p>
+          )}
+        </div>
+
+        {/* PAYMENT DETAILS */}
+        <div className="border rounded-lg p-4 mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <CreditCard size={18} />
+            <h3 className="font-semibold">Payment Details</h3>
+          </div>
+
+          <p><strong>Method:</strong> {order.payment_method || "N/A"}</p>
+
+          {order.payment_method === "Razorpay" && (
+            <p><strong>Payment ID:</strong> {order.payment_id}</p>
+          )}
+
+          {order.payment_method === "COD" && (
+            <p className="text-green-600 font-medium">
+              Cash on Delivery
+            </p>
+          )}
+        </div>
+
+        {/* ORDER SUMMARY */}
         <div className="border rounded-lg p-4 mb-6">
           <h3 className="font-semibold mb-3">Order Summary</h3>
           <div className="flex justify-between">
@@ -131,11 +158,23 @@ const OrderDetailsModal = ({ orderId, onClose }: Props) => {
           </div>
         </div>
 
-        {/* Cancel Button */}
+        {/* CANCEL BUTTON */}
         {order.status !== "Delivered" &&
           order.status !== "Cancelled" && (
             <button
-              onClick={cancelOrder}
+              onClick={async () => {
+                try {
+                  await axios.put(
+                    `http://localhost:5000/api/orders/${orderId}/cancel`,
+                    {},
+                    { headers: { Authorization: `Bearer ${token}` } }
+                  );
+                  toast.success("Order cancelled");
+                  fetchOrder();
+                } catch {
+                  toast.error("Cancel failed");
+                }
+              }}
               className="w-full bg-red-500 text-white py-3 rounded-lg hover:bg-red-600 transition"
             >
               Cancel Order

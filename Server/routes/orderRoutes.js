@@ -28,7 +28,7 @@ router.post("/", verifyToken, (req, res) => {
   }
 
   const status =
-    payment_method === "COD" ? "Pending" : "Paid";
+    payment_method === "COD" ? "Received" : "Paid";
 
   db.query(
     `INSERT INTO orders 

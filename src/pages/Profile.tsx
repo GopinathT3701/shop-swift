@@ -215,7 +215,7 @@ const Profile = () => {
                     <span
   className={`text-xs px-3 py-1 rounded-full font-medium
     ${
-      order.status === "Pending"
+      order.status === "Received"
         ? "bg-yellow-100 text-yellow-700"
         : order.status === "Paid"
         ? "bg-blue-100 text-blue-700"
