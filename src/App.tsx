@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import Checkout from "./pages/Checkout";
 import ProfileLayout from "./pages/profile/ProfileLayout";
 import AccountTab from "./pages/profile/AccountTab";
 import OrdersTab from "./pages/profile/OrdersTab";
@@ -40,6 +41,7 @@ const App = () => (
                 <Route path="/profile" element={<Profile />} />
                 <Route path="*" element={<NotFound />} />
                 <Route path="/privacy" element={<Privacy />} />
+                <Route path="/checkout" element={<Checkout />} />
                 <Route path="/profile" element={<ProfileLayout />}>
   <Route path="account" element={<AccountTab />} />
   <Route path="orders" element={<OrdersTab />} />
