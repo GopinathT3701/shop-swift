@@ -125,7 +125,8 @@ const Profile = () => {
           </div>
 
           <h2 className="text-lg font-semibold">{user?.name}</h2>
-          <p className="text-sm text-muted-foreground">{user?.email}</p>
+          <p className="text-sm text-muted-foreground">{user?.email}</p><br></br>
+          <p className="text-sm text-muted-foreground">{user?.phone}</p>
 
           <button
             onClick={() => setShowEdit(true)}
@@ -276,11 +277,12 @@ const Profile = () => {
 
       {showEdit && (
         <EditProfileModal
-          currentName={user?.name}
-          currentPic={user?.profile_pic}
-          onClose={() => setShowEdit(false)}
-          onSaved={fetchProfile}
-        />
+  currentName={user?.name}
+  currentPhone={user?.phone}
+  currentPic={user?.profile_pic}
+  onClose={() => setShowEdit(false)}
+  onSaved={fetchProfile}
+/>
       )}
 
       {selectedOrder && (

@@ -26,7 +26,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
-      <Sonner />
+      <Sonner position="top-right" richColors/>
       <BrowserRouter>
         <CartProvider>
           <div className="flex min-h-screen flex-col">

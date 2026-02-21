@@ -24,18 +24,39 @@ const OrderDetailsModal = ({ orderId, onClose }: Props) => {
 
       setOrder(res.data.order);
       setItems(res.data.items);
-      setLoading(false);
     } catch {
       toast.error("Failed to load order");
+    } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchOrder();
-  }, []);
+  }, [orderId]);
 
-  if (loading || !order) return null;
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="bg-white p-6 rounded-lg">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!order) return null;
+
+  // ✅ Safe Calculations
+  const subtotal =
+    order.subtotal ??
+    items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+
+  const shipping =
+    order.shipping ?? (subtotal >= 499 ? 0 : 49);
+
+  const total = order.total ?? subtotal + shipping;
 
   const steps = ["Received", "Processed", "Shipped", "Delivered"];
   const currentStep = steps.indexOf(order.status);
@@ -152,9 +173,30 @@ const OrderDetailsModal = ({ orderId, onClose }: Props) => {
         {/* ORDER SUMMARY */}
         <div className="border rounded-lg p-4 mb-6">
           <h3 className="font-semibold mb-3">Order Summary</h3>
-          <div className="flex justify-between">
+
+          <div className="flex justify-between mb-2">
+            <span>Subtotal</span>
+            <span>₹ {subtotal.toFixed(2)}</span>
+          </div>
+
+          <div className="flex justify-between mb-2">
+            <span>Delivery Charges</span>
+            <span>
+              {shipping === 0 ? (
+                <span className="text-green-600 font-semibold">
+                  Free Shipping
+                </span>
+              ) : (
+                `₹ ${shipping.toFixed(2)}`
+              )}
+            </span>
+          </div>
+
+          <hr className="my-3" />
+
+          <div className="flex justify-between font-bold text-lg">
             <span>Total</span>
-            <span className="font-bold">₹ {order.total}</span>
+            <span>₹ {total.toFixed(2)}</span>
           </div>
         </div>
 

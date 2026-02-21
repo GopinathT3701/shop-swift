@@ -14,20 +14,28 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState("Razorpay");
   const [loading, setLoading] = useState(false);
 
-  const shippingCost = 50;
+  // ✅ SHIPPING LOGIC
+  const shippingCost = totalPrice >= 499 ? 0 : 49;
   const finalTotal = totalPrice + shippingCost;
 
   useEffect(() => {
-    axios.get("http://localhost:5000/api/address", {
-      headers: { Authorization: `Bearer ${token}` },
-    }).then(res => {
-      setAddresses(res.data);
-    });
+    axios
+      .get("http://localhost:5000/api/address", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => {
+        setAddresses(res.data);
+      })
+      .catch(() => {
+        toast.error("Failed to load addresses");
+      });
   }, []);
 
   // ================= COD ORDER =================
   const placeCODOrder = async () => {
     try {
+      setLoading(true);
+
       await axios.post(
         "http://localhost:5000/api/orders",
         {
@@ -37,67 +45,83 @@ const Checkout = () => {
             price: item.product.price,
           })),
           total: finalTotal,
+          shipping: shippingCost,
           address_id: selectedAddress.id,
-          payment_method: "COD"
+          payment_method: "COD",
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       toast.success("Order Placed (Cash on Delivery)");
-      items.forEach(item => removeFromCart(item.product.id));
+      items.forEach((item) => removeFromCart(item.product.id));
       navigate("/profile");
-
     } catch {
       toast.error("Order failed");
+    } finally {
+      setLoading(false);
     }
   };
 
   // ================= RAZORPAY =================
   const placeRazorpayOrder = async () => {
-    const { data } = await axios.post(
-      "http://localhost:5000/api/payment/create-order",
-      { amount: finalTotal },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    try {
+      setLoading(true);
 
-    const options = {
-      key: "rzp_test_SFxIn9vseSSiih",
-      amount: data.amount,
-      currency: "INR",
-      order_id: data.id,
-      handler: async function (response: any) {
-        await axios.post(
-          "http://localhost:5000/api/payment/verify",
-          {
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature,
-            items: items.map(item => ({
-              product_id: item.product.id,
-              quantity: item.quantity,
-              price: item.product.price
-            })),
-            total: finalTotal,
-            address_id: selectedAddress.id,
-            payment_method: "Razorpay",
-            payment_id: response.razorpay_payment_id
-          },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+      const { data } = await axios.post(
+        "http://localhost:5000/api/payment/create-order",
+        { amount: finalTotal },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-        toast.success("Payment Successful");
-        items.forEach(item => removeFromCart(item.product.id));
-        navigate("/profile");
-      }
-    };
+      const options = {
+        key: "rzp_test_SFxIn9vseSSiih",
+        amount: data.amount,
+        currency: "INR",
+        order_id: data.id,
+        handler: async function (response: any) {
+          await axios.post(
+            "http://localhost:5000/api/payment/verify",
+            {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              items: items.map((item) => ({
+                product_id: item.product.id,
+                quantity: item.quantity,
+                price: item.product.price,
+              })),
+              total: finalTotal,
+              shipping: shippingCost,
+              address_id: selectedAddress.id,
+              payment_method: "Razorpay",
+              payment_id: response.razorpay_payment_id,
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
 
-    const rzp = new (window as any).Razorpay(options);
-    rzp.open();
+          toast.success("Payment Successful");
+          items.forEach((item) => removeFromCart(item.product.id));
+          navigate("/profile");
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+    } catch {
+      toast.error("Payment failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePlaceOrder = () => {
     if (!selectedAddress) {
       toast.error("Select delivery address");
+      return;
+    }
+
+    if (items.length === 0) {
+      toast.error("Cart is empty");
       return;
     }
 
@@ -130,31 +154,49 @@ const Checkout = () => {
             </div>
           )}
 
-          {addresses.map(addr => (
-            <div
-              key={addr.id}
-              onClick={() => setSelectedAddress(addr)}
-              className={`border p-4 mb-3 cursor-pointer ${
-                selectedAddress?.id === addr.id
-                  ? "border-blue-500 bg-blue-50"
-                  : ""
-              }`}
-            >
-              <p>{addr.name}</p>
-              <p>{addr.address1}</p>
-              <p>{addr.city}, {addr.state}</p>
-            </div>
-          ))}
+          {addresses.map((addr) => (
+  <label
+    key={addr.id}
+    className={`flex items-start gap-4 border p-4 mb-3 rounded-lg cursor-pointer transition ${
+      selectedAddress?.id === addr.id
+        ? "border-blue-500 bg-blue-50"
+        : "border-gray-300"
+    }`}
+  >
+    {/* Radio Button */}
+    <input
+      type="radio"
+      name="address"
+      checked={selectedAddress?.id === addr.id}
+      onChange={() => setSelectedAddress(addr)}
+      className="mt-1"
+    />
+
+    {/* Address Content */}
+    <div>
+      <p className="font-semibold">{addr.name}</p>
+      <p className="text-sm text-gray-700">{addr.address1}</p>
+      <p className="text-sm text-gray-700">
+        {addr.city}, {addr.state}
+      </p>
+    </div>
+  </label>
+))}
+
         </div>
 
         {/* PRODUCTS */}
         <div className="border rounded-xl p-6">
           <h2 className="font-bold mb-4">2️⃣ Product Details</h2>
 
-          {items.map(item => (
+          {items.map((item) => (
             <div key={item.product.id} className="flex justify-between mb-2">
-              <span>{item.product.name}</span>
-              <span>₹ {(item.product.price * item.quantity).toFixed(2)}</span>
+              <span>
+                {item.product.name} × {item.quantity}
+              </span>
+              <span>
+                ₹ {(item.product.price * item.quantity).toFixed(2)}
+              </span>
             </div>
           ))}
         </div>
@@ -168,7 +210,8 @@ const Checkout = () => {
               type="radio"
               checked={paymentMethod === "Razorpay"}
               onChange={() => setPaymentMethod("Razorpay")}
-            /> Razorpay
+            />{" "}
+            Razorpay
           </label>
 
           <label>
@@ -176,7 +219,8 @@ const Checkout = () => {
               type="radio"
               checked={paymentMethod === "COD"}
               onChange={() => setPaymentMethod("COD")}
-            /> Cash on Delivery
+            />{" "}
+            Cash on Delivery
           </label>
         </div>
       </div>
@@ -185,28 +229,48 @@ const Checkout = () => {
       <div className="border rounded-xl p-6 h-fit">
         <h3 className="font-bold mb-4">Order Summary</h3>
 
+        {totalPrice >= 499 && (
+          <p className="text-green-600 text-sm mb-2">
+            🎉 You have unlocked Free Shipping!
+          </p>
+        )}
+
+        {totalPrice < 499 && (
+          <p className="text-sm mb-2 text-gray-600">
+            Add ₹ {(499 - totalPrice).toFixed(2)} more to get Free Shipping
+
+          </p>
+        )}
+
         <div className="flex justify-between">
           <span>Cart</span>
-          <span>₹ {totalPrice}</span>
+          <span>₹ {totalPrice.toFixed(2)}</span>
         </div>
 
         <div className="flex justify-between">
           <span>Shipping</span>
-          <span>₹ {shippingCost}</span>
+          <span>
+            {shippingCost === 0 ? (
+              <span className="text-green-600 font-semibold">Free</span>
+            ) : (
+              `₹ ${shippingCost}`
+            )}
+          </span>
         </div>
 
-        <hr className="my-4"/>
+        <hr className="my-4" />
 
         <div className="flex justify-between font-bold text-lg">
           <span>Total</span>
-          <span>₹ {finalTotal}</span>
+          <span>₹ {finalTotal.toFixed(2)}</span>
         </div>
 
         <button
           onClick={handlePlaceOrder}
-          className="mt-6 w-full bg-purple-600 text-white py-3 rounded-lg"
+          disabled={loading}
+          className="mt-6 w-full bg-orange-400 text-white py-3 rounded-lg disabled:opacity-50"
         >
-          Place Order
+          {loading ? "Processing..." : "Place Order"}
         </button>
       </div>
     </div>

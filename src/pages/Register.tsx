@@ -4,24 +4,52 @@ import { toast } from "sonner";
 import axios from "axios";
 
 const Register = () => {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const navigate = useNavigate();
+
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+    agree: false,
+  });
+
+  const handleChange = (e: any) => {
+    const { name, value, type, checked } = e.target;
+
+    setForm({
+      ...form,
+      [name]: type === "checkbox" ? checked : value,
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // 🔒 Password match check
+    if (form.password !== form.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    // 🔒 Terms check
+    if (!form.agree) {
+      toast.error("Please agree to Terms & Conditions");
+      return;
+    }
+
     try {
       await axios.post("http://localhost:5000/api/auth/register", {
-        name,
-        email,
-        password,
+        full_name: form.full_name,
+        email: form.email,
+        phone: form.phone,
+        password: form.password,
+        agree: form.agree,
       });
 
       toast.success("Registration successful! Please login.");
       navigate("/login");
-
     } catch (error: any) {
       toast.error(
         error.response?.data?.message || "Registration failed"
@@ -42,46 +70,101 @@ const Register = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* Full Name */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
               Full Name
             </label>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              name="full_name"
+              value={form.full_name}
+              onChange={handleChange}
               className="w-full rounded-lg border border-input bg-card px-4 py-3 text-sm"
               placeholder="John Doe"
               required
             />
           </div>
 
+          {/* Email */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
               Email
             </label>
             <input
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              name="email"
+              value={form.email}
+              onChange={handleChange}
               className="w-full rounded-lg border border-input bg-card px-4 py-3 text-sm"
               placeholder="you@example.com"
               required
             />
           </div>
 
+          {/* Phone */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Phone Number
+            </label>
+            <input
+              type="tel"
+              name="phone"
+              value={form.phone}
+              onChange={handleChange}
+              className="w-full rounded-lg border border-input bg-card px-4 py-3 text-sm"
+              placeholder="9876543210"
+              required
+            />
+          </div>
+
+          {/* Password */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
               Password
             </label>
             <input
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              name="password"
+              value={form.password}
+              onChange={handleChange}
               className="w-full rounded-lg border border-input bg-card px-4 py-3 text-sm"
               placeholder="••••••••"
               required
             />
+          </div>
+
+          {/* Confirm Password */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Confirm Password
+            </label>
+            <input
+              type="password"
+              name="confirmPassword"
+              value={form.confirmPassword}
+              onChange={handleChange}
+              className="w-full rounded-lg border border-input bg-card px-4 py-3 text-sm"
+              placeholder="••••••••"
+              required
+            />
+          </div>
+
+          {/* Terms Checkbox */}
+          <div className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="agree"
+              checked={form.agree}
+              onChange={handleChange}
+            />
+            <span>
+              I agree to the{" "}
+              <span className="text-primary font-medium">
+                Terms & Conditions
+              </span>
+            </span>
           </div>
 
           <button
