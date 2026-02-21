@@ -27,7 +27,7 @@ router.post("/", verifyToken, (req, res) => {
     return res.status(400).json({ message: "Address required" });
   }
 
-  const status =
+  
     payment_method === "COD" ? "Received" : "Paid";
 
   db.query(
