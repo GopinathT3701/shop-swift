@@ -3,6 +3,7 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import { db } from "../config/db.js";
 import verifyToken from "../middleware/verifyToken.js";
+import sendEmail from "../utils/sendEmail.js"; 
 
 const router = express.Router();
 
@@ -29,7 +30,7 @@ router.post("/create-order", verifyToken, async (req, res) => {
 });
 
 // Verify & Save Order
-router.post("/verify", verifyToken, (req, res) => {
+router.post("/verify", verifyToken, async (req, res) => {
   const {
     razorpay_order_id,
     razorpay_payment_id,
@@ -52,39 +53,69 @@ router.post("/verify", verifyToken, (req, res) => {
     return res.status(400).json({ message: "Invalid signature" });
   }
 
-  db.query(
-    "INSERT INTO orders (user_id, total, status, address_id, payment_method, payment_id) VALUES (?, ?, ?, ?, ?, ?)",
-    [
-      req.user.id,
-      total,
-      "Paid",
-      address_id,
-      payment_method,
-      payment_id,
-    ],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
+  try {
+    // 1️⃣ Insert Order
+    const [orderResult] = await db.promise().query(
+      `INSERT INTO orders 
+       (user_id, total, status, address_id, payment_method, payment_id) 
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        req.user.id,
+        total,
+        "Paid",
+        address_id,
+        payment_method,
+        payment_id,
+      ]
+    );
 
-      const orderId = result.insertId;
+    const orderId = orderResult.insertId;
 
-      const values = items.map((item) => [
-        orderId,
-        item.product_id,
-        item.quantity,
-        item.price,
-      ]);
+    // 2️⃣ Insert Items
+    const values = items.map((item) => [
+      orderId,
+      item.product_id,
+      item.quantity,
+      item.price,
+    ]);
 
-      db.query(
-        "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ?",
-        [values],
-        (err2) => {
-          if (err2) return res.status(500).json(err2);
+    await db.promise().query(
+      `INSERT INTO order_items 
+       (order_id, product_id, quantity, price) 
+       VALUES ?`,
+      [values]
+    );
 
-          res.json({ message: "Order saved successfully" });
-        }
+    // 3️⃣ Fetch User Email
+    const [userRows] = await db.promise().query(
+      `SELECT email FROM users WHERE id=?`,
+      [req.user.id]
+    );
+
+    if (userRows.length > 0) {
+      const userEmail = userRows[0].email;
+
+      await sendEmail(
+        userEmail,
+        `Order #${orderId} Confirmed 🛒`,
+        `
+        <h2>🎉 Payment Successful!</h2>
+        <p><b>Order ID:</b> ${orderId}</p>
+        <p><b>Total:</b> ₹${total}</p>
+        <p><b>Status:</b> Paid</p>
+        <br/>
+        <p>Thank you for shopping with Shopvibe.</p>
+        `
       );
-    }
-  );
-});
 
+      console.log("✅ Razorpay confirm mail sent");
+    }
+
+    res.json({ message: "Order saved successfully" });
+
+  } catch (error) {
+    console.error("Razorpay verify error:", error);
+    res.status(500).json({ message: "Order verification failed" });
+  }
+});
 export default router;
