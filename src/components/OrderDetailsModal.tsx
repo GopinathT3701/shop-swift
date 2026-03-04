@@ -132,23 +132,23 @@ const OrderDetailsModal = ({ orderId, onClose }: Props) => {
         </div>
 
         {/* DELIVERY ADDRESS */}
-        <div className="border rounded-lg p-4 mb-6">
-          <div className="flex items-center gap-2 mb-2">
-            <MapPin size={18} />
-            <h3 className="font-semibold">Delivery Address</h3>
-          </div>
+<div className="border rounded-lg p-4 mb-6">
+  <div className="flex items-center gap-2 mb-2">
+    <MapPin size={18} />
+    <h3 className="font-semibold">Delivery Address</h3>
+  </div>
 
-          {order.name ? (
-            <>
-              <p>{order.name}</p>
-              <p>{order.address1}</p>
-              <p>{order.city}, {order.state}</p>
-              <p>{order.zipcode}</p>
-            </>
-          ) : (
-            <p className="text-gray-500">No address available</p>
-          )}
-        </div>
+  {order?.address1 ? (
+    <>
+      <p>{order.name}</p>
+      <p>{order.address1}</p>
+      <p>{order.city}, {order.state}</p>
+      <p>{order.zipcode}</p>
+    </>
+  ) : (
+    <p className="text-gray-500">No address available</p>
+  )}
+</div>
 
         {/* PAYMENT DETAILS */}
         <div className="border rounded-lg p-4 mb-6">

@@ -48,25 +48,119 @@ router.post("/", verifyToken, async (req, res) => {
       [values]
     );
 
-    // 3️⃣ Fetch email
+   
+    // 3️⃣ Fetch user email
     const [userRows] = await db.promise().query(
       `SELECT email FROM users WHERE id=?`,
       [userId]
     );
 
-    if (userRows.length > 0) {
-      const userEmail = userRows[0].email;
+    if (userRows.length === 0) {
+      return res.json({ message: "Order placed", orderId });
+    }
+
+    const userEmail = userRows[0].email;
+
+    // 4️⃣ Fetch Address
+    const [addressRows] = await db.promise().query(
+      `SELECT name, mobile, address1, city, state, zipcode 
+       FROM addresses 
+       WHERE id=? AND user_id=?`,
+      [address_id, userId]
+    );
+
+    const address = addressRows[0];
+
+    // 5️⃣ Fetch product names for mail
+    const productIds = items.map((i) => i.product_id);
+
+    const [products] = await db.promise().query(
+      `SELECT id, name FROM products WHERE id IN (?)`,
+      [productIds]
+    );
+
+    const orderItems = items.map((item) => {
+      const product = products.find((p) => p.id === item.product_id);
+      return {
+        name: product?.name || "Product",
+        quantity: item.quantity,
+        price: item.price,
+      };
+    });
+
+    // 6️⃣ Send Email
+    if (payment_method === "COD") {
 
       await sendEmail(
-        userEmail,
-        `Order #${orderId} Confirmed 🛒`,
-        `
-        <h2>🎉 Order Confirmed!</h2>
-        <p><b>Order ID:</b> ${orderId}</p>
-        <p><b>Total:</b> ₹${total}</p>
-        <p><b>Status:</b> ${status}</p>
-        `
-      );
+  userEmail,
+  `Order #${orderId} Placed 🛒`,
+  `
+  <div style="font-family:Arial; background:#f6f6f6; padding:20px;">
+    <div style="max-width:650px; margin:auto; background:#fff; padding:25px; border-radius:6px;">
+
+      <h2>🛒 Order Placed Successfully</h2>
+      <p>Your order has been placed with <b>Shopvibe</b>.</p>
+
+      <table style="width:100%; margin-top:15px;">
+        <tr>
+          <td><b>Order ID:</b></td>
+          <td>#${orderId}</td>
+        </tr>
+        <tr>
+          <td><b>Payment Method:</b></td>
+          <td>Cash on Delivery</td>
+        </tr>
+        <tr>
+          <td><b>Total Amount:</b></td>
+          <td>₹${total}</td>
+        </tr>
+      </table>
+
+      <h3 style="margin-top:20px;">🛍 Ordered Items</h3>
+
+      <table style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr style="background:#f1f1f1;">
+            <th style="padding:8px; border:1px solid #ddd;">Product</th>
+            <th style="padding:8px; border:1px solid #ddd;">Qty</th>
+            <th style="padding:8px; border:1px solid #ddd;">Price</th>
+            <th style="padding:8px; border:1px solid #ddd;">Total</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${orderItems.map(
+            (item) => `
+            <tr>
+              <td style="padding:8px; border:1px solid #ddd;">${item.name}</td>
+              <td style="padding:8px; border:1px solid #ddd;">${item.quantity}</td>
+              <td style="padding:8px; border:1px solid #ddd;">₹${item.price}</td>
+              <td style="padding:8px; border:1px solid #ddd;">
+                ₹${item.price * item.quantity}
+              </td>
+            </tr>
+          `
+          ).join("")}
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:20px;">📦 Delivery Address</h3>
+
+      <p style="line-height:1.6;">
+        <b>${address?.name || ""}</b><br/>
+        ${address?.address1 || ""}<br/>
+        ${address?.city || ""}, ${address?.state || ""} - ${address?.zipcode || ""}
+        📞 ${address?.mobile || ""}<br/>
+      </p>
+
+      <p style="font-size:13px;color:#777;margin-top:20px;">
+        Please keep cash ready at the time of delivery.
+      </p>
+
+    </div>
+  </div>
+  `
+);
 
       console.log("✅ COD confirm mail sent");
     }
@@ -127,31 +221,43 @@ router.get("/my", verifyToken, (req, res) => {
 router.get("/:id", verifyToken, (req, res) => {
   const orderId = req.params.id;
 
-  db.query(
-    `SELECT * FROM orders WHERE id=? AND user_id=?`,
-    [orderId, req.user.id],
-    (err, orderResult) => {
-      if (err) return res.status(500).json(err);
-      if (orderResult.length === 0)
-        return res.status(404).json({ message: "Order not found" });
+  const orderQuery = `
+    SELECT o.*, 
+           a.name, 
+           a.mobile,
+           a.address1, 
+           a.city, 
+           a.state, 
+           a.zipcode
+    FROM orders o
+    LEFT JOIN addresses a 
+      ON o.address_id = a.id 
+      AND a.user_id = o.user_id
+    WHERE o.id = ? AND o.user_id = ?
+  `;
 
-      db.query(
-        `SELECT oi.*, p.name, p.image
-         FROM order_items oi
-         JOIN products p ON oi.product_id = p.id
-         WHERE oi.order_id = ?`,
-        [orderId],
-        (err2, itemsResult) => {
-          if (err2) return res.status(500).json(err2);
+  db.query(orderQuery, [orderId, req.user.id], (err, orderResult) => {
+    if (err) return res.status(500).json(err);
 
-          res.json({
-            order: orderResult[0],
-            items: itemsResult,
-          });
-        }
-      );
-    }
-  );
+    if (orderResult.length === 0)
+      return res.status(404).json({ message: "Order not found" });
+
+    db.query(
+      `SELECT oi.*, p.name, p.image
+       FROM order_items oi
+       JOIN products p ON oi.product_id = p.id
+       WHERE oi.order_id = ?`,
+      [orderId],
+      (err2, itemsResult) => {
+        if (err2) return res.status(500).json(err2);
+
+        res.json({
+          order: orderResult[0],
+          items: itemsResult,
+        });
+      }
+    );
+  });
 });
 
 // =============================

@@ -19,17 +19,29 @@ const Checkout = () => {
   const finalTotal = totalPrice + shippingCost;
 
   useEffect(() => {
-    axios
-      .get("http://localhost:5000/api/address", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        setAddresses(res.data);
-      })
-      .catch(() => {
-        toast.error("Failed to load addresses");
-      });
-  }, []);
+  axios
+    .get("http://localhost:5000/api/address", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    .then((res) => {
+      setAddresses(res.data);
+
+      // 🔥 Auto Select Logic
+      if (res.data.length === 1) {
+        setSelectedAddress(res.data[0]);
+      } else {
+        const defaultAddr = res.data.find(
+          (addr: any) => addr.is_default === 1
+        );
+        if (defaultAddr) {
+          setSelectedAddress(defaultAddr);
+        }
+      }
+    })
+    .catch(() => {
+      toast.error("Failed to load addresses");
+    });
+}, []);
 
   // ================= COD ORDER =================
   const placeCODOrder = async () => {
