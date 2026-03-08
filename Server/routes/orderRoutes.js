@@ -3,6 +3,11 @@ import { db } from "../config/db.js";
 import verifyToken from "../middleware/verifyToken.js";
 import sendEmail from "../utils/sendEmail.js";
 
+import customerCOD from "../emails/customerCOD.js";
+import customerPaid from "../emails/customerPaid.js";
+import adminOrder from "../emails/adminOrder.js";
+
+
 const router = express.Router();
 
 // =============================
@@ -88,82 +93,33 @@ router.post("/", verifyToken, async (req, res) => {
       };
     });
 
-    // 6️⃣ Send Email
-    if (payment_method === "COD") {
+// CUSTOMER EMAIL
+if (payment_method === "COD") {
 
-      await sendEmail(
-  userEmail,
-  `Order #${orderId} Placed 🛒`,
-  `
-  <div style="font-family:Arial; background:#f6f6f6; padding:20px;">
-    <div style="max-width:650px; margin:auto; background:#fff; padding:25px; border-radius:6px;">
+  await sendEmail(
+    userEmail,
+    `Order #${orderId} Placed`,
+    customerCOD(orderId, total, orderItems, address)
+  );
 
-      <h2>🛒 Order Placed Successfully</h2>
-      <p>Your order has been placed with <b>Shopvibe</b>.</p>
+} else {
 
-      <table style="width:100%; margin-top:15px;">
-        <tr>
-          <td><b>Order ID:</b></td>
-          <td>#${orderId}</td>
-        </tr>
-        <tr>
-          <td><b>Payment Method:</b></td>
-          <td>Cash on Delivery</td>
-        </tr>
-        <tr>
-          <td><b>Total Amount:</b></td>
-          <td>₹${total}</td>
-        </tr>
-      </table>
+  await sendEmail(
+    userEmail,
+    `Payment Successful`,
+    customerPaid(orderId, total, orderItems, address)
+  );
 
-      <h3 style="margin-top:20px;">🛍 Ordered Items</h3>
+}
 
-      <table style="width:100%; border-collapse:collapse;">
-        <thead>
-          <tr style="background:#f1f1f1;">
-            <th style="padding:8px; border:1px solid #ddd;">Product</th>
-            <th style="padding:8px; border:1px solid #ddd;">Qty</th>
-            <th style="padding:8px; border:1px solid #ddd;">Price</th>
-            <th style="padding:8px; border:1px solid #ddd;">Total</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          ${orderItems.map(
-            (item) => `
-            <tr>
-              <td style="padding:8px; border:1px solid #ddd;">${item.name}</td>
-              <td style="padding:8px; border:1px solid #ddd;">${item.quantity}</td>
-              <td style="padding:8px; border:1px solid #ddd;">₹${item.price}</td>
-              <td style="padding:8px; border:1px solid #ddd;">
-                ₹${item.price * item.quantity}
-              </td>
-            </tr>
-          `
-          ).join("")}
-        </tbody>
-      </table>
-
-      <h3 style="margin-top:20px;">📦 Delivery Address</h3>
-
-      <p style="line-height:1.6;">
-        <b>${address?.name || ""}</b><br/>
-        ${address?.address1 || ""}<br/>
-        ${address?.city || ""}, ${address?.state || ""} - ${address?.zipcode || ""}
-        📞 ${address?.mobile || ""}<br/>
-      </p>
-
-      <p style="font-size:13px;color:#777;margin-top:20px;">
-        Please keep cash ready at the time of delivery.
-      </p>
-
-    </div>
-  </div>
-  `
+// ADMIN EMAIL
+await sendEmail(
+  process.env.ADMIN_EMAIL,
+  `New Order #${orderId}`,
+  adminOrder(orderId, total, orderItems, address, payment_method)
 );
 
-      console.log("✅ COD confirm mail sent");
-    }
+console.log("✅ Order emails sent");
 
     res.json({
       message: "Order placed successfully",
@@ -173,8 +129,9 @@ router.post("/", verifyToken, async (req, res) => {
   } catch (error) {
     console.error("Order error:", error);
     res.status(500).json({ message: "Order failed" });
-  }
+  };
 });
+
 
 // =============================
 // 🟢 GET MY ORDERS
